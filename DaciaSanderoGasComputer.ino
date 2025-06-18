@@ -4,7 +4,7 @@
 #include <Fonts/FreeSans9pt7b.h>
 #include "BluetoothSerial.h"
 #include "ELMduino.h"
-#include "layout.h"
+#include "layout.h" // Twój plik layout.h
 #include "logo.h"
 #include "sandero.h"
 
@@ -49,68 +49,51 @@ uint32_t current_rpm = 0;
 uint8_t current_speed = 0;
 float current_oil_temp = 0.0;
 float current_coolant_temp = 0.0;
-// Dodaj te deklaracje na początku Twojego pliku, najlepiej obok innych zmiennych globalnych
 float current_maf = 0.0;
 float current_fuel_consumption = 0.0; // W L/100km
+uint8_t current_fuel_type_code = 0xFF; // Globalna zmienna, zainicjalizowana wartością błędu
 
 // Stałe do obliczeń spalania
-// Te wartości są dla BENZYNY. Jeśli masz LPG, konieczna będzie kalibracja!
 const float AIR_FUEL_RATIO_GASOLINE = 14.7;     // Stosunek stechiometryczny powietrze/paliwo dla benzyny
 const float GASOLINE_DENSITY_G_PER_L = 710.0;   // Gęstość benzyny w g/L (około)
-
-// Jeśli używasz LPG, rozważ dodanie współczynnika kalibracji ustalonego empirycznie.
-// const float LPG_CALIBRATION_FACTOR = 1.25; // Przykładowy współczynnik korekcji dla LPG (np. 25% więcej paliwa)
-// const float AIR_FUEL_RATIO_LPG = 15.5;   // Orientacyjny stosunek dla LPG
-// const float LPG_DENSITY_G_PER_L = 530.0; // Orientacyjna gęstość LPG (może się różnić)
 
 // Kolory
 #define COLOR_HEADER ST77XX_CYAN
 #define COLOR_VALUE ST77XX_WHITE
 #define COLOR_ERROR ST77XX_RED
 
-// --- Zmiany tutaj ---
 // Definicja stanów odczytu OBD
 enum OBD_STATE {
   ENG_RPM,
   SPEED,
-  OIL_TEMP,  // Dodajemy nowe stany dla kolejnych odczytów
+  OIL_TEMP,
   COOLANT_TEMP,
-  FUEL_CONS  // Zużycie paliwa (jeśli będzie implementowane na podstawie PID)
+  FUEL_CONS,
+  FUEL_TYPE_UPDATE // Zmieniona nazwa, aby uniknąć konfliktu, i by było jasne, że to aktualizacja wyświetlania
 };
 
 // Zmienna stanu
 OBD_STATE obd_state = ENG_RPM;
 
-/// --- Funkcja do obliczania spalania (dodaj ją gdzieś poza funkcją readAndDisplayOBD) ---
+// --- Funkcja do obliczania spalania ---
 void calculateFuelConsumptionValue(float maf, uint8_t speed) {
-    // Sprawdź, czy dane są sensowne i samochód się porusza
-    if (speed > 0 && maf > 0) {
-        // 1. Oblicz zużycie paliwa w gramach na sekundę
-        float fuel_g_per_s = maf / AIR_FUEL_RATIO_GASOLINE; // Użyj AIR_FUEL_RATIO_LPG jeśli na LPG
+  if (speed > 0 && maf > 0) {
+    float fuel_g_per_s = maf / AIR_FUEL_RATIO_GASOLINE;
+    float fuel_L_per_s = fuel_g_per_s / GASOLINE_DENSITY_G_PER_L;
+    float speed_km_per_s = speed / 3600.0;
+    float fuel_L_per_km = fuel_L_per_s / speed_km_per_s;
+    current_fuel_consumption = fuel_L_per_km * 100.0;
 
-        // 2. Konwersja na litry na sekundę
-        float fuel_L_per_s = fuel_g_per_s / GASOLINE_DENSITY_G_PER_L; // Użyj LPG_DENSITY_G_PER_L jeśli na LPG
-
-        // 3. Konwersja prędkości z km/h na km/s
-        float speed_km_per_s = speed / 3600.0; // 3600 sekund w godzinie
-
-        // 4. Oblicz spalanie w L/100km
-        float fuel_L_per_km = fuel_L_per_s / speed_km_per_s;
-        current_fuel_consumption = fuel_L_per_km * 100.0;
-
-        // Jeśli używasz LPG, zastosuj współczynnik korekcji (ustawiony empirycznie!)
-        // current_fuel_consumption *= LPG_CALIBRATION_FACTOR;
-
-        DEBUG_PORT.print("Spalanie (estymowane): ");
-        DEBUG_PORT.print(current_fuel_consumption, 2); // Wyświetl z 2 miejscami po przecinku
-        DEBUG_PORT.println(" L/100km");
-    } else {
-        current_fuel_consumption = 0.0; // Samochód stoi lub brak danych
-        DEBUG_PORT.println("Samochód stoi lub brak danych MAF, nie można obliczyć spalania.");
-    }
+    DEBUG_PORT.print("Spalanie (estymowane): ");
+    DEBUG_PORT.print(current_fuel_consumption, 2);
+    DEBUG_PORT.println(" L/100km");
+  } else {
+    current_fuel_consumption = 0.0;
+    DEBUG_PORT.println("Samochód stoi lub brak danych MAF, nie można obliczyć spalania.");
+  }
 }
 
-// --- Twoja główna funkcja readAndDisplayOBD() ---
+// --- Główna funkcja readAndDisplayOBD() ---
 void readAndDisplayOBD() {
   switch (obd_state) {
     case ENG_RPM:
@@ -121,29 +104,29 @@ void readAndDisplayOBD() {
           DEBUG_PORT.print("RPM: ");
           DEBUG_PORT.println(current_rpm);
           drawRPM(current_rpm, 0, TOP_HEIGHT + (SCREEN_HEIGHT - TOP_HEIGHT) / 2, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
-          obd_state = SPEED;  // Przejście do następnego stanu
+          obd_state = SPEED;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
-          current_rpm = 0;    // Ustaw 0 w przypadku błędu
-          obd_state = SPEED;  // Przejście do następnego stanu nawet w przypadku błędu
+          current_rpm = 0;
+          obd_state = SPEED;
         }
         break;
       }
 
     case SPEED:
       {
-        float tempSpeed = myELM327.kph();  // Zmieniamy na kph dla km/h
+        float tempSpeed = myELM327.kph();
         if (myELM327.nb_rx_state == ELM_SUCCESS) {
           current_speed = (uint8_t)tempSpeed;
           DEBUG_PORT.print("Speed: ");
           DEBUG_PORT.print(current_speed);
           DEBUG_PORT.println(" km/h");
           drawSpeed(current_speed, SCREEN_WIDTH / 2, TOP_HEIGHT + (SCREEN_HEIGHT - TOP_HEIGHT) / 2, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
-          obd_state = OIL_TEMP;  // Przejście do następnego stanu
+          obd_state = OIL_TEMP;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
-          current_speed = 0;     // Ustaw 0 w przypadku błędu
-          obd_state = OIL_TEMP;  // Przejście do następnego stanu
+          current_speed = 0;
+          obd_state = OIL_TEMP;
         }
         break;
       }
@@ -175,56 +158,68 @@ void readAndDisplayOBD() {
           DEBUG_PORT.print(current_coolant_temp);
           DEBUG_PORT.println(" C");
           drawCoolantTemp(current_coolant_temp, SCREEN_WIDTH / 2, TOP_HEIGHT, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
-          obd_state = FUEL_CONS; // Przechodzimy do nowego stanu do obliczania spalania
+          obd_state = FUEL_CONS;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
           current_coolant_temp = -1;
-          obd_state = FUEL_CONS; // Przechodzimy do kolejnego stanu mimo błędu
+          obd_state = FUEL_CONS;
         }
         break;
       }
 
     case FUEL_CONS:
       {
-        // --- Tutaj wstawiamy właściwą logikę do obliczania spalania ---
-        current_maf = myELM327.mafRate(); // Odczyt przepływu masowego powietrza (MAF)
+        current_maf = myELM327.mafRate();
 
         if (myELM327.nb_rx_state == ELM_SUCCESS) {
-            DEBUG_PORT.print("MAF: ");
-            DEBUG_PORT.print(current_maf);
-            DEBUG_PORT.println(" g/s");
+          DEBUG_PORT.print("MAF: ");
+          DEBUG_PORT.print(current_maf);
+          DEBUG_PORT.println(" g/s");
 
-            // Używamy już odczytanej prędkości z poprzedniego stanu "SPEED"
-            // Jeśli potrzebujesz najnowszej prędkości w tym miejscu, możesz dodać:
-            // current_speed = myELM327.kph();
-            // if (myELM327.nb_rx_state == ELM_SUCCESS) { /* ... */ } else { /* ... */ }
+          calculateFuelConsumptionValue(current_maf, current_speed);
 
-            // Obliczamy spalanie używając MAF i DOKŁADNEJ (aktualnej) prędkości
-            // Używamy current_speed, który powinien być aktualny z poprzedniego odczytu.
-            // Jeśli odczyt prędkości jest w tym samym cyklu odczytu co MAF, to jest ok.
-            // Jeśli prędkość jest odczytywana rzadziej, pamiętaj, że spalanie będzie z mniejszą precyzją.
-            calculateFuelConsumptionValue(current_maf, current_speed);
+          DEBUG_PORT.print("Fuel Consumption: ");
+          DEBUG_PORT.print(current_fuel_consumption, 1);
+          DEBUG_PORT.println(" L/100km");
 
-            DEBUG_PORT.print("Fuel Consumption: ");
-            DEBUG_PORT.print(current_fuel_consumption, 1);
-            DEBUG_PORT.println(" L/100km");
-
-            drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH);
-            obd_state = ENG_RPM;  // Powrót do pierwszego stanu, aby cykl się powtarzał
+          drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH);
+          obd_state = FUEL_TYPE_UPDATE;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
-            myELM327.printError();
-            DEBUG_PORT.println("Błąd odczytu MAF. Spalanie ustawione na 0.");
-            current_maf = 0.0;
-            current_fuel_consumption = 0.0; // W przypadku błędu MAF, zerujemy spalanie
-            drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH); // Odśwież wyświetlacz
-            obd_state = ENG_RPM;  // Przejście do następnego stanu
+          myELM327.printError();
+          DEBUG_PORT.println("Błąd odczytu MAF. Spalanie ustawione na 0.");
+          current_maf = 0.0;
+          current_fuel_consumption = 0.0;
+          drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH);
+          obd_state = FUEL_TYPE_UPDATE;
         }
+        break;
+      }
+
+    case FUEL_TYPE_UPDATE: // Odpowiedzialność za odczyt i przekazanie kodu do rysowania
+      {
+        uint8_t tempFuelTypeCode = myELM327.fuelType(); // Odczytaj wartość z OBD
+
+        if (myELM327.nb_rx_state == ELM_SUCCESS) {
+          current_fuel_type_code = tempFuelTypeCode; // Zapisz odczytaną wartość
+          DEBUG_PORT.print("Fuel Type Code: ");
+          DEBUG_PORT.println(current_fuel_type_code, HEX); // Wyświetl kod w HEX dla łatwiejszego debugowania
+        } else { // W przypadku błędu odczytu (różne od ELM_GETTING_MSG)
+          myELM327.printError();
+          DEBUG_PORT.println("Błąd odczytu typu paliwa.");
+          // Ustaw current_fuel_type_code na specjalną wartość błędu (np. 0xFF),
+          // aby drawFuelTypeSection mogła to obsłużyć.
+          current_fuel_type_code = 0xFF;
+        }
+
+        // Zawsze wywołaj funkcję rysującą z aktualnym kodem lub kodem błędu
+        drawFuelTypeSection(current_fuel_type_code, topLeftW, 0, topRightW, topRightH);
+        obd_state = ENG_RPM; // Powrót na początek cyklu
         break;
       }
   }
 }
 
-// Funkcje pomocnicze do generowania losowych danych
+// Funkcje pomocnicze do generowania losowych danych (możesz je usunąć, jeśli już ich nie używasz)
 float randFloat0to25() {
   return ((float)rand() / (float)RAND_MAX) * 25.0;
 }
@@ -242,7 +237,7 @@ void setup() {
   digitalWrite(LCD_BLK, HIGH);
   tft.setFont(&FreeSans9pt7b);
 
-  setDisplay(&tft);  // Ustawienie wskaźnika do obiektu TFT w display.h
+  setDisplay(&tft); // Ustawienie wskaźnika do obiektu TFT w display.h
 
   tft.drawRGBBitmap(0, 0, logo, 320, 170);
   delay(3000);
@@ -258,8 +253,7 @@ void setup() {
   if (!ELM_PORT.connect(elm327_address)) {
     DEBUG_PORT.println("Couldn't connect to OBD scanner - Phase 1 (Bluetooth)");
     showCenteredStatusText("Brak polaczenia z BT", ST77XX_RED);
-    while (1)
-      ;
+    while (1);
   }
   DEBUG_PORT.println("Bluetooth connected.");
   showCenteredStatusText("Polaczono z BT", ST77XX_YELLOW);
@@ -269,18 +263,29 @@ void setup() {
   if (!myELM327.begin(ELM_PORT, false, 2000)) {
     DEBUG_PORT.println("Couldn't connect to OBD scanner - Phase 2 (ELM327)");
     showCenteredStatusText("Brak polaczenia z OBD", ST77XX_RED);
-    while (1)
-      ;
+    while (1);
   }
   DEBUG_PORT.println("Connected to ELM327");
   showCenteredStatusText("Polaczono z OBD", ST77XX_GREEN);
   delay(1000);
 
-  // Rysowanie początkowego układu na ekranie
-  drawLayout(SCREEN_WIDTH, SCREEN_HEIGHT, TOP_HEIGHT, topLeftW, topLeftH, topRightW, topRightH);
+  // Odczytaj typ paliwa raz po połączeniu
+  uint8_t initialReadFuelTypeCode = myELM327.fuelType();
+  if (myELM327.nb_rx_state == ELM_SUCCESS) {
+    current_fuel_type_code = initialReadFuelTypeCode;
+    DEBUG_PORT.print("Initial Fuel Type Code: ");
+    DEBUG_PORT.println(current_fuel_type_code, HEX); // Wyświetl w HEX
+  } else {
+    myELM327.printError();
+    DEBUG_PORT.println("Błąd początkowego odczytu typu paliwa.");
+    current_fuel_type_code = 0xFF; // Ustaw 0xFF dla błędu
+  }
+
+  // Rysowanie początkowego układu na ekranie, przekazując odczytany typ paliwa
+  drawLayout(SCREEN_WIDTH, SCREEN_HEIGHT, TOP_HEIGHT, topLeftW, topLeftH, topRightW, topRightH, current_fuel_type_code);
 }
 
 void loop() {
-  readAndDisplayOBD();  // Wywołujemy nową funkcję do odczytu danych
-  delay(50);  // Krótkie opóźnienie, aby nie obciążać CPU i pozwolić na stabilne odczyty
+  readAndDisplayOBD();
+  delay(50);
 }

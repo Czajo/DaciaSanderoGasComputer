@@ -212,6 +212,75 @@ void drawSpeed(int value, int x, int y, int w, int h) {
 }
 
 /**
+ * @brief Rysuje sekcję typu paliwa w oparciu o odczytany kod.
+ * @param fuelCode Kod typu paliwa z OBD. Użyj 0xFF dla błędu/nieznanego stanu.
+ * @param x Współrzędna X lewego górnego rogu sekcji.
+ * @param y Współrzędna Y lewego górnego rogu sekcji.
+ * @param w Szerokość sekcji.
+ * @param h Wysokość sekcji.
+ */
+void drawFuelTypeSection(uint8_t fuelCode, int x, int y, int w, int h) {
+  if (!tftPtr) return;
+
+  // Wyczyść sekcję, aby uniknąć artefaktów
+  tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
+
+  const char* fuelText = "UNKNOWN"; // Domyślny tekst
+  uint16_t bgColor = ST77XX_BLACK;  // Domyślny kolor tła
+  uint16_t textColor = ST77XX_WHITE; // Domyślny kolor tekstu
+
+  // Użyj 0xFF jako specjalnej wartości dla stanu błędu/braku odczytu
+  if (fuelCode == 0xFF) {
+      drawExampleBitmap(x + (w - ARROW_W) / 2, y + (h - ARROW_H) / 2);
+      // Możesz dodać mały tekst "BŁĄD" pod ikoną
+      drawCenteredText("BLAD", x, y + h - 20, w, 20); // Mały tekst na dole sekcji
+      return; // Zakończ funkcję, jeśli narysowano ikonę błędu
+  }
+
+  switch (fuelCode) {
+    case 0x01: // Kod dla Gasoline
+      fuelText = "BENZYNA";
+      bgColor = ST77XX_ORANGE;
+      textColor = ST77XX_BLACK; // Czarny napis na pomarańczowym tle
+      break;
+    case 0x04: // Kod dla Diesel
+      fuelText = "DIESEL";
+      bgColor = ST77XX_BLUE;
+      textColor = ST77XX_WHITE; // Biały napis na niebieskim tle
+      break;
+    case 0x05: // Kod dla LPG
+      fuelText = "LPG";
+      bgColor = ST77XX_GREEN;
+      textColor = ST77XX_BLACK; // Czarny napis na zielonym tle
+      break;
+    case 0x0C: // Kod dla Benzyna/LPG (Bi-Fuel Gasoline/LPG)
+      fuelText = "Pb/LPG";
+      bgColor = ST77XX_GREEN;
+      textColor = ST77XX_BLACK;
+      break;
+    case 0x09: // Kod dla Biopaliwo (Bio-fuel)
+        fuelText = "BIO-PAL.";
+        bgColor = ST77XX_ORANGE;
+        textColor = ST77XX_BLACK;
+        break;
+    default:
+      // Jeśli kod nie pasuje do żadnego z powyższych, wyświetl kod szesnastkowy
+      char buf[5];
+      snprintf(buf, sizeof(buf), "0x%02X", fuelCode);
+      fuelText = buf; // Tekst to teraz kod
+      // Pozostaw domyślne kolory czarne/białe
+      break;
+  }
+
+  // Wypełnij tło wybranym kolorem
+  tftPtr->fillRect(x, y, w, h, bgColor);
+
+  // Rysuj wycentrowany tekst
+  tftPtr->setTextColor(textColor); // Ustaw kolor tekstu
+  drawCenteredText(fuelText, x, y, w, h); // Wyśrodkuj tekst w całej sekcji
+}
+
+/**
  * @brief Rysuje ogólny układ ekranu.
  * @param SCREEN_WIDTH Całkowita szerokość ekranu.
  * @param SCREEN_HEIGHT Całkowita wysokość ekranu.
@@ -220,17 +289,17 @@ void drawSpeed(int value, int x, int y, int w, int h) {
  * @param topLeftH Wysokość lewej górnej sekcji.
  * @param topRightW Szerokość prawej górnej sekcji.
  * @param topRightH Wysokość prawej górnej sekcji.
+ * @param initialFuelTypeCode Początkowy kod typu paliwa do wyświetlenia. Użyj 0xFF dla błędu/nieznanego.
  */
-void drawLayout(int SCREEN_WIDTH, int SCREEN_HEIGHT, int TOP_HEIGHT, int topLeftW, int topLeftH, int topRightW, int topRightH) {
+void drawLayout(int SCREEN_WIDTH, int SCREEN_HEIGHT, int TOP_HEIGHT, int topLeftW, int topLeftH, int topRightW, int topRightH, uint8_t initialFuelTypeCode) {
   if (tftPtr) {
     tftPtr->fillScreen(ST77XX_BLACK); // Wyczyść ekran
 
     // Górna lewa sekcja "Spalanie"
     tftPtr->fillRect(0, 0, topLeftW, topLeftH, ST77XX_BLACK);
 
-    // Górna prawa sekcja na ikonę
-    tftPtr->fillRect(topLeftW, 0, topRightW, topRightH, ST77XX_BLACK);
-    drawExampleBitmap(topLeftW + (topRightW - ARROW_W) / 2, (topRightH - ARROW_H) / 2);
+    // Górna prawa sekcja na typ paliwa
+    drawFuelTypeSection(initialFuelTypeCode, topLeftW, 0, topRightW, topRightH);
   }
 }
 
