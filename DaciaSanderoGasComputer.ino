@@ -50,6 +50,19 @@ uint8_t current_speed = 0;
 float current_fuel_consumption = 0.0;
 float current_oil_temp = 0.0;
 float current_coolant_temp = 0.0;
+// Dodaj te deklaracje na początku Twojego pliku, najlepiej obok innych zmiennych globalnych
+float current_maf = 0.0;
+float current_fuel_consumption = 0.0; // W L/100km
+
+// Stałe do obliczeń spalania
+// Te wartości są dla BENZYNY. Jeśli masz LPG, konieczna będzie kalibracja!
+const float AIR_FUEL_RATIO_GASOLINE = 14.7;     // Stosunek stechiometryczny powietrze/paliwo dla benzyny
+const float GASOLINE_DENSITY_G_PER_L = 710.0;   // Gęstość benzyny w g/L (około)
+
+// Jeśli używasz LPG, rozważ dodanie współczynnika kalibracji ustalonego empirycznie.
+// const float LPG_CALIBRATION_FACTOR = 1.25; // Przykładowy współczynnik korekcji dla LPG (np. 25% więcej paliwa)
+// const float AIR_FUEL_RATIO_LPG = 15.5;   // Orientacyjny stosunek dla LPG
+// const float LPG_DENSITY_G_PER_L = 530.0; // Orientacyjna gęstość LPG (może się różnić)
 
 // Kolory
 #define COLOR_HEADER ST77XX_CYAN
@@ -79,6 +92,7 @@ void readAndDisplayOBD() {
           current_rpm = (uint32_t)tempRPM;
           DEBUG_PORT.print("RPM: ");
           DEBUG_PORT.println(current_rpm);
+          drawRPM(current_rpm, 0, TOP_HEIGHT + (SCREEN_HEIGHT - TOP_HEIGHT) / 2, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
           obd_state = SPEED;  // Przejście do następnego stanu
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
@@ -96,10 +110,11 @@ void readAndDisplayOBD() {
           DEBUG_PORT.print("Speed: ");
           DEBUG_PORT.print(current_speed);
           DEBUG_PORT.println(" km/h");
+          drawSpeed(current_speed, SCREEN_WIDTH / 2, TOP_HEIGHT + (SCREEN_HEIGHT - TOP_HEIGHT) / 2, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
           obd_state = OIL_TEMP;  // Przejście do następnego stanu
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
-          current_speed = 0;     // Ustaw 0 w przypadku błędu
+          current_speed = -1;    // Ustaw 0 w przypadku błędu
           obd_state = OIL_TEMP;  // Przejście do następnego stanu
         }
         break;
@@ -107,21 +122,22 @@ void readAndDisplayOBD() {
 
     case OIL_TEMP:
       {
-              {
-        float tempOil = myELM327.oilTemp();
-        if (myELM327.nb_rx_state == ELM_SUCCESS) {
-          current_oil_temp = tempOil;
-          DEBUG_PORT.print("Oil Temp: ");
-          DEBUG_PORT.print(current_oil_temp);
-          DEBUG_PORT.println(" C");
-          obd_state = COOLANT_TEMP;
-        } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
-          myELM327.printError();
-          current_oil_temp = randFloat0to25() + 60;  // Losowa wartość w przypadku błędu
-          obd_state = COOLANT_TEMP;
+        {
+          float tempOil = myELM327.oilTemp();
+          if (myELM327.nb_rx_state == ELM_SUCCESS) {
+            current_oil_temp = tempOil;
+            DEBUG_PORT.print("Oil Temp: ");
+            DEBUG_PORT.print(current_oil_temp);
+            DEBUG_PORT.println(" C");
+            drawOilTemp(current_oil_temp, 0, TOP_HEIGHT, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
+            obd_state = COOLANT_TEMP;
+          } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
+            myELM327.printError();
+            current_oil_temp = -1;
+            obd_state = COOLANT_TEMP;
+          }
+          break;
         }
-        break;
-      }
       }
       break;
 
@@ -133,10 +149,11 @@ void readAndDisplayOBD() {
           DEBUG_PORT.print("Coolant Temp: ");
           DEBUG_PORT.print(current_coolant_temp);
           DEBUG_PORT.println(" C");
+          drawCoolantTemp(current_coolant_temp, SCREEN_WIDTH / 2, TOP_HEIGHT, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
           obd_state = FUEL_CONS;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
-          current_coolant_temp = randFloat0to25() + 60;  // Losowa wartość w przypadku błędu
+          current_coolant_temp = -1;
           obd_state = FUEL_CONS;
         }
         break;
@@ -150,6 +167,7 @@ void readAndDisplayOBD() {
         DEBUG_PORT.print("Fuel Consumption: ");
         DEBUG_PORT.print(current_fuel_consumption, 1);
         DEBUG_PORT.println(" L/100km");
+        drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH);
         obd_state = ENG_RPM;  // Powrót do pierwszego stanu, aby cykl się powtarzał
         break;
       }
@@ -214,13 +232,5 @@ void setup() {
 
 void loop() {
   readAndDisplayOBD();  // Wywołujemy nową funkcję do odczytu danych
-
-  // RYSOWANIE DANYCH NA EKRANIE (teraz zaktualizowane zmienne globalne)
-  drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH);
-  drawOilTemp(current_oil_temp, 0, TOP_HEIGHT, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
-  drawCoolantTemp(current_coolant_temp, SCREEN_WIDTH / 2, TOP_HEIGHT, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
-  drawRPM(current_rpm, 0, TOP_HEIGHT + (SCREEN_HEIGHT - TOP_HEIGHT) / 2, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
-  drawSpeed(current_speed, SCREEN_WIDTH / 2, TOP_HEIGHT + (SCREEN_HEIGHT - TOP_HEIGHT) / 2, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
-
-  delay(100);  // Krótkie opóźnienie, aby nie obciążać CPU i pozwolić na stabilne odczyty
+  delay(50);  // Krótkie opóźnienie, aby nie obciążać CPU i pozwolić na stabilne odczyty
 }
