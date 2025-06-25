@@ -47,4 +47,7 @@ void readAndDisplayOBD();
 // Funkcja do obliczania spalania
 void calculateFuelConsumptionValue(float maf, uint8_t speed);
 
+// Funkcja do dodawania logów debug (zdefiniowana w głównym pliku)
+extern void addDebugLog(String message);
+
 #endif // ELM327_CONNECTION_H 

@@ -82,11 +82,13 @@ void calculateFuelConsumptionValue(float maf, uint8_t speed) {
       air_fuel_ratio = AIR_FUEL_RATIO_LPG;
       fuel_density = LPG_DENSITY_G_PER_L;
       DEBUG_PORT.println("Obliczanie spalania dla LPG");
+      addDebugLog("Spalanie: LPG");
     } else {
       // Benzyna (domyślnie)
       air_fuel_ratio = AIR_FUEL_RATIO_GASOLINE;
       fuel_density = GASOLINE_DENSITY_G_PER_L;
       DEBUG_PORT.println("Obliczanie spalania dla benzyny");
+      addDebugLog("Spalanie: Benzyna");
     }
     
     float fuel_g_per_s = maf / air_fuel_ratio;
@@ -105,18 +107,28 @@ void calculateFuelConsumptionValue(float maf, uint8_t speed) {
       DEBUG_PORT.print("Spalanie (estymowane): ");
       DEBUG_PORT.print(current_fuel_consumption, 2);
       DEBUG_PORT.println(" L/100km");
+      
+      // Dodaj do logów debug
+      String logMsg = "MAF:" + String(maf, 1) + "g/s Sp:" + String(speed) + "km/h";
+      addDebugLog(logMsg);
+      logMsg = "Spalanie: " + String(current_fuel_consumption, 1) + "L/100km";
+      addDebugLog(logMsg);
     } else {
       current_fuel_consumption = 0.0;
       DEBUG_PORT.println("Prędkość zbyt niska, nie można obliczyć spalania.");
+      addDebugLog("Spalanie: Prędkość zbyt niska");
     }
   } else {
     current_fuel_consumption = 0.0;
     if (speed <= 0) {
       DEBUG_PORT.println("Samochód stoi, nie można obliczyć spalania.");
+      addDebugLog("Spalanie: Samochód stoi");
     } else if (maf <= 0) {
       DEBUG_PORT.println("Brak danych MAF, nie można obliczyć spalania.");
+      addDebugLog("Spalanie: Brak MAF");
     } else {
       DEBUG_PORT.println("MAF poza zakresem, nie można obliczyć spalania.");
+      addDebugLog("Spalanie: MAF poza zakresem");
     }
   }
 }
@@ -134,8 +146,10 @@ void readAndDisplayOBD() {
           if (tempRPM < 100) {
             current_rpm = 0; // lub np. -1 jeśli chcesz wyświetlać "---"
             DEBUG_PORT.println("RPM zbyt niskie, ustawiam 0");
+            addDebugLog("RPM: <100 (0)");
           } else {
             current_rpm = (uint32_t)tempRPM;
+            addDebugLog("RPM: " + String(current_rpm));
           }
           DEBUG_PORT.print("RPM: ");
           DEBUG_PORT.println(current_rpm);
@@ -144,6 +158,7 @@ void readAndDisplayOBD() {
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
           current_rpm = 0;
+          addDebugLog("RPM: Błąd odczytu");
           obd_state = SPEED;
         }
         break;
@@ -158,11 +173,13 @@ void readAndDisplayOBD() {
           DEBUG_PORT.print("Speed: ");
           DEBUG_PORT.print(current_speed);
           DEBUG_PORT.println(" km/h");
+          addDebugLog("Speed: " + String(current_speed) + "km/h");
           drawSpeed(current_speed, SCREEN_WIDTH / 2, TOP_HEIGHT + (SCREEN_HEIGHT - TOP_HEIGHT) / 2, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
           obd_state = OIL_TEMP;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
           current_speed = 0;
+          addDebugLog("Speed: Błąd odczytu");
           obd_state = OIL_TEMP;
         }
         break;
@@ -177,11 +194,13 @@ void readAndDisplayOBD() {
           DEBUG_PORT.print("Oil Temp: ");
           DEBUG_PORT.print(current_oil_temp);
           DEBUG_PORT.println(" C");
+          addDebugLog("Oil: " + String(current_oil_temp, 1) + "°C");
           drawOilTemp(current_oil_temp, 0, TOP_HEIGHT, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
           obd_state = COOLANT_TEMP;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
           current_oil_temp = -1;
+          addDebugLog("Oil: Błąd odczytu");
           obd_state = COOLANT_TEMP;
         }
         break;
@@ -196,11 +215,13 @@ void readAndDisplayOBD() {
           DEBUG_PORT.print("Coolant Temp: ");
           DEBUG_PORT.print(current_coolant_temp);
           DEBUG_PORT.println(" C");
+          addDebugLog("Coolant: " + String(current_coolant_temp, 1) + "°C");
           drawCoolantTemp(current_coolant_temp, SCREEN_WIDTH / 2, TOP_HEIGHT, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
           obd_state = FUEL_TYPE_UPDATE;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
           current_coolant_temp = -1;
+          addDebugLog("Coolant: Błąd odczytu");
           obd_state = FUEL_TYPE_UPDATE;
         }
         break;
@@ -229,6 +250,7 @@ void readAndDisplayOBD() {
           DEBUG_PORT.println("Błąd odczytu MAF. Spalanie ustawione na 0.");
           current_maf = 0.0;
           current_fuel_consumption = 0.0;
+          addDebugLog("MAF: Błąd odczytu");
           drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH);
           obd_state = ENG_RPM;
         }
@@ -244,10 +266,12 @@ void readAndDisplayOBD() {
           current_fuel_type_code = tempFuelTypeCode; // Zapisz odczytaną wartość
           DEBUG_PORT.print("Fuel Type Code: ");
           DEBUG_PORT.println(current_fuel_type_code, HEX); // Wyświetl kod w HEX dla łatwiejszego debugowania
+          addDebugLog("Fuel: 0x" + String(current_fuel_type_code, HEX));
           obd_state = FUEL_CONS;
         } else { // W przypadku błędu odczytu (różne od ELM_GETTING_MSG)
           myELM327.printError();
           DEBUG_PORT.println("Błąd odczytu typu paliwa.");
+          addDebugLog("Fuel: Błąd odczytu");
           // Ustaw current_fuel_type_code na specjalną wartość błędu (np. 0xFF),
           // aby drawFuelTypeSection mogła to obsłużyć.
           current_fuel_type_code = 0xFF;
