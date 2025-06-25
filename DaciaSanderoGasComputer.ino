@@ -8,18 +8,27 @@
 #include "elm327_connection.h"
 #include "display_init.h"
 
+// Prawidłowe piny dla Twojej płytki
+#define TFT_MOSI 23
+#define TFT_SCLK 18
+#define TFT_CS   15
+#define TFT_DC   2
+#define TFT_RST  4
+#define TFT_BLK  32
+#define BOOT_BUTTON_PIN 0
+
 // Kolory
 #define COLOR_HEADER ST77XX_CYAN
 #define COLOR_VALUE ST77XX_WHITE
 #define COLOR_ERROR ST77XX_RED
 
-// Definicje pinów
-#define BOOT_BUTTON_PIN 0
-
 // Zmienne globalne
 bool debugMode = false;
 String debugLog[10]; // Bufor na ostatnie 10 linii logów
 int debugLogIndex = 0;
+
+// Makro do logowania na Serial i do bufora ekranu
+#define DEBUG_LOG(msg) do { DEBUG_PORT.println(msg); addDebugLog(String(msg)); } while(0)
 
 // Funkcja do dodawania logów do bufora
 void addDebugLog(String message) {
@@ -30,11 +39,9 @@ void addDebugLog(String message) {
 // Funkcja do wyświetlania logów na ekranie
 void displayDebugLog() {
   if (!tftPtr) return;
-  
   tftPtr->fillScreen(ST77XX_BLACK);
   tftPtr->setTextColor(ST77XX_WHITE);
   tftPtr->setTextSize(1);
-  
   int y = 10;
   for (int i = 0; i < 10; i++) {
     int index = (debugLogIndex - 1 - i + 10) % 10;
@@ -44,9 +51,7 @@ void displayDebugLog() {
       y += 15;
     }
   }
-  
-  // Wyświetl informację o trybie
-  tftPtr->setCursor(5, SCREEN_HEIGHT - 20);
+  tftPtr->setCursor(5, 160);
   tftPtr->setTextColor(ST77XX_YELLOW);
   tftPtr->print("DEBUG MODE - BOOT to exit");
 }
@@ -56,73 +61,60 @@ void checkBootButton() {
   static bool lastButtonState = HIGH;
   static unsigned long lastDebounceTime = 0;
   unsigned long debounceDelay = 50;
-  
   bool buttonState = digitalRead(BOOT_BUTTON_PIN);
-  
   if (buttonState != lastButtonState) {
     lastDebounceTime = millis();
   }
-  
   if ((millis() - lastDebounceTime) > debounceDelay) {
     if (buttonState == LOW && lastButtonState == HIGH) {
-      // Guzik został wciśnięty
       debugMode = !debugMode;
-      
       if (debugMode) {
         addDebugLog("=== DEBUG MODE ON ===");
-        displayDebugLog();
       } else {
         addDebugLog("=== DEBUG MODE OFF ===");
-        // Przywróć normalny layout
         drawLayout(SCREEN_WIDTH, SCREEN_HEIGHT, TOP_HEIGHT, topLeftW, topLeftH, topRightW, topRightH, current_fuel_type_code);
       }
     }
   }
-  
   lastButtonState = buttonState;
 }
 
+// Inicjalizacja wyświetlacza z prawidłowymi pinami
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+
 void setup() {
   DEBUG_PORT.begin(115200);
-
-  // Inicjalizacja guzika BOOT
   pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP);
-
-  // Inicjalizacja wyświetlacza
+  pinMode(TFT_BLK, OUTPUT);
+  digitalWrite(TFT_BLK, HIGH);
+  tft.init(170, 320);
+  tft.setRotation(3);
+  setDisplay(&tft);
   initializeDisplay();
-  
-  // Wyświetl ekrany startowe
   showStartupScreens();
-
-  // --- Proces połączenia z OBD-II ---
+  addDebugLog("=== DEBUG MODE ON ===");
   showConnectionStatus("Podlaczanie do auta", ST77XX_BLUE);
-  
-  // Inicjalizacja połączenia Bluetooth
+  DEBUG_LOG("Podlaczanie do auta");
   if (!initializeBluetoothConnection()) {
-    while (1); // Zatrzymaj program jeśli nie można połączyć z Bluetooth
+    DEBUG_LOG("Blad polaczenia z Bluetooth");
+    while (1);
   }
-  
-  // Inicjalizacja połączenia ELM327
+  DEBUG_LOG("Bluetooth OK");
   if (!initializeELM327Connection()) {
-    while (1); // Zatrzymaj program jeśli nie można połączyć z ELM327
+    DEBUG_LOG("Blad polaczenia z ELM327");
+    while (1);
   }
-
-  // Rysowanie początkowego układu na ekranie, przekazując odczytany typ paliwa
-  drawLayout(SCREEN_WIDTH, SCREEN_HEIGHT, TOP_HEIGHT, topLeftW, topLeftH, topRightW, topRightH, 0xFF); // Na starcie pokaż "BENZYNA" lub "LPG" po pierwszym odczycie w pętli
+  DEBUG_LOG("ELM327 OK");
+  drawLayout(SCREEN_WIDTH, SCREEN_HEIGHT, TOP_HEIGHT, topLeftW, topLeftH, topRightW, topRightH, 0xFF);
 }
 
 void loop() {
-  // Sprawdź guzik BOOT
   checkBootButton();
-  
   if (debugMode) {
-    // W trybie debug tylko aktualizuj logi, nie rysuj layoutu
-    // Logi będą dodawane przez funkcje w elm327_connection.cpp
     displayDebugLog();
+    delay(100);
   } else {
-    // Normalny tryb - odczytuj i wyświetlaj dane OBD
     readAndDisplayOBD();
+    delay(10);
   }
-  
-  delay(10);
 }

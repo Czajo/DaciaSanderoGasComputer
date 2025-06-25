@@ -23,7 +23,7 @@
 
 // Deklaracje zmiennych ekranu
 extern int topLeftW, topLeftH, topRightW, topRightH;
-extern Adafruit_ST7789 tft;
+extern Adafruit_ST7789 *tftPtr;
 
 // Funkcje inicjalizacji ekranu
 void initializeDisplay();

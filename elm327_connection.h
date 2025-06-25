@@ -4,6 +4,12 @@
 #include "BluetoothSerial.h"
 #include "ELMduino.h"
 
+// Makro do logowania na Serial i do bufora ekranu
+#ifndef DEBUG_LOG_MACRO
+#define DEBUG_LOG_MACRO
+#define DEBUG_LOG(msg) do { DEBUG_PORT.println(msg); addDebugLog(String(msg)); } while(0)
+#endif
+
 // Obiekty Bluetooth i ELM327
 extern BluetoothSerial SerialBT;
 #define ELM_PORT SerialBT

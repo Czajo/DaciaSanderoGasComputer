@@ -1,4 +1,5 @@
 #include "layout.h"
+#include <Fonts/FreeSans9pt7b.h>
 
 // Deklaracja wskaźnika do obiektu Adafruit_ST7789
 Adafruit_ST7789 *tftPtr;
@@ -6,17 +7,6 @@ Adafruit_ST7789 *tftPtr;
 // Funkcja do ustawienia wskaźnika do obiektu TFT
 void setDisplay(Adafruit_ST7789 *display) {
   tftPtr = display;
-}
-
-/**
- * @brief Rysuje bitmapę strzałki na wyświetlaczu.
- * @param x Współrzędna X lewego górnego rogu bitmapy.
- * @param y Współrzędna Y lewego górnego rogu bitmapy.
- */
-void drawExampleBitmap(int x, int y) {
-  if (tftPtr) {
-    tftPtr->drawRGBBitmap(x, y, arrow_rgb565, ARROW_W, ARROW_H);
-  }
 }
 
 /**
@@ -52,23 +42,19 @@ void showCenteredStatusText(const String text, uint16_t color) {
     tftPtr->fillScreen(ST77XX_BLACK);
     tftPtr->setTextWrap(false);
     tftPtr->setTextSize(1); // Większy rozmiar tekstu dla statusu
+    tftPtr->setFont(&FreeSans9pt7b); // Czcionka wektorowa
     tftPtr->setTextColor(color);
 
     int16_t x1, y1;
     uint16_t w, h;
-    // TFT_WIDTH i TFT_HEIGHT nie są globalne w display.h, więc musimy je przekazać lub założyć
-    // Tutaj zakładamy, że SCREEN_WIDTH i SCREEN_HEIGHT są zdefiniowane w main.ino
-    // i używamy ich jako domyślnych rozmiarów ekranu
-    int screen_width_local = 320; // Możesz dostosować, jeśli znasz dokładny rozmiar ekranu
-    int screen_height_local = 170; // Możesz dostosować, jeśli znasz dokładny rozmiar ekranu
-
+    int screen_width_local = 320;
+    int screen_height_local = 170;
     tftPtr->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
-
     int16_t x = (screen_width_local - w) / 2 - x1;
     int16_t y = (screen_height_local - h) / 2 - y1;
-
     tftPtr->setCursor(x, y);
     tftPtr->print(text);
+    tftPtr->setFont(); // Przywróć domyślną czcionkę bitmapową
   }
 }
 
