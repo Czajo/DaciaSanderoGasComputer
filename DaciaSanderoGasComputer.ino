@@ -95,12 +95,20 @@ void calculateFuelConsumptionValue(float maf, uint8_t speed) {
 
 // --- Główna funkcja readAndDisplayOBD() ---
 void readAndDisplayOBD() {
+  // Dodaj logowanie stanu
+  DEBUG_PORT.print("Aktualny stan: ");
   switch (obd_state) {
     case ENG_RPM:
+      DEBUG_PORT.println("ENG_RPM");
       {
         float tempRPM = myELM327.rpm();
         if (myELM327.nb_rx_state == ELM_SUCCESS) {
-          current_rpm = (uint32_t)tempRPM;
+          if (tempRPM < 100) {
+            current_rpm = 0; // lub np. -1 jeśli chcesz wyświetlać "---"
+            DEBUG_PORT.println("RPM zbyt niskie, ustawiam 0");
+          } else {
+            current_rpm = (uint32_t)tempRPM;
+          }
           DEBUG_PORT.print("RPM: ");
           DEBUG_PORT.println(current_rpm);
           drawRPM(current_rpm, 0, TOP_HEIGHT + (SCREEN_HEIGHT - TOP_HEIGHT) / 2, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
@@ -114,6 +122,7 @@ void readAndDisplayOBD() {
       }
 
     case SPEED:
+      DEBUG_PORT.println("SPEED");
       {
         float tempSpeed = myELM327.kph();
         if (myELM327.nb_rx_state == ELM_SUCCESS) {
@@ -132,6 +141,7 @@ void readAndDisplayOBD() {
       }
 
     case OIL_TEMP:
+      DEBUG_PORT.println("OIL_TEMP");
       {
         float tempOil = myELM327.oilTemp();
         if (myELM327.nb_rx_state == ELM_SUCCESS) {
@@ -150,6 +160,7 @@ void readAndDisplayOBD() {
       }
 
     case COOLANT_TEMP:
+      DEBUG_PORT.println("COOLANT_TEMP");
       {
         float tempCoolant = myELM327.engineCoolantTemp();
         if (myELM327.nb_rx_state == ELM_SUCCESS) {
@@ -158,16 +169,17 @@ void readAndDisplayOBD() {
           DEBUG_PORT.print(current_coolant_temp);
           DEBUG_PORT.println(" C");
           drawCoolantTemp(current_coolant_temp, SCREEN_WIDTH / 2, TOP_HEIGHT, SCREEN_WIDTH / 2, (SCREEN_HEIGHT - TOP_HEIGHT) / 2);
-          obd_state = FUEL_CONS;
+          obd_state = FUEL_TYPE_UPDATE;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
           current_coolant_temp = -1;
-          obd_state = FUEL_CONS;
+          obd_state = FUEL_TYPE_UPDATE;
         }
         break;
       }
 
     case FUEL_CONS:
+      DEBUG_PORT.println("FUEL_CONS");
       {
         current_maf = myELM327.mafRate();
 
@@ -183,19 +195,20 @@ void readAndDisplayOBD() {
           DEBUG_PORT.println(" L/100km");
 
           drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH);
-          obd_state = FUEL_TYPE_UPDATE;
+          obd_state = ENG_RPM;
         } else if (myELM327.nb_rx_state != ELM_GETTING_MSG) {
           myELM327.printError();
           DEBUG_PORT.println("Błąd odczytu MAF. Spalanie ustawione na 0.");
           current_maf = 0.0;
           current_fuel_consumption = 0.0;
           drawFuelConsumption(current_fuel_consumption, 0, 0, topLeftW, topLeftH);
-          obd_state = FUEL_TYPE_UPDATE;
+          obd_state = ENG_RPM;
         }
         break;
       }
 
-    case FUEL_TYPE_UPDATE: // Odpowiedzialność za odczyt i przekazanie kodu do rysowania
+    case FUEL_TYPE_UPDATE:
+      DEBUG_PORT.println("FUEL_TYPE_UPDATE");
       {
         uint8_t tempFuelTypeCode = myELM327.fuelType(); // Odczytaj wartość z OBD
 
@@ -203,6 +216,7 @@ void readAndDisplayOBD() {
           current_fuel_type_code = tempFuelTypeCode; // Zapisz odczytaną wartość
           DEBUG_PORT.print("Fuel Type Code: ");
           DEBUG_PORT.println(current_fuel_type_code, HEX); // Wyświetl kod w HEX dla łatwiejszego debugowania
+          obd_state = FUEL_CONS;
         } else { // W przypadku błędu odczytu (różne od ELM_GETTING_MSG)
           myELM327.printError();
           DEBUG_PORT.println("Błąd odczytu typu paliwa.");
@@ -213,7 +227,7 @@ void readAndDisplayOBD() {
 
         // Zawsze wywołaj funkcję rysującą z aktualnym kodem lub kodem błędu
         drawFuelTypeSection(current_fuel_type_code, topLeftW, 0, topRightW, topRightH);
-        obd_state = ENG_RPM; // Powrót na początek cyklu
+        obd_state = FUEL_CONS; // Powrót na początek cyklu
         break;
       }
   }
@@ -269,23 +283,11 @@ void setup() {
   showCenteredStatusText("Polaczono z OBD", ST77XX_GREEN);
   delay(1000);
 
-  // Odczytaj typ paliwa raz po połączeniu
-  uint8_t initialReadFuelTypeCode = myELM327.fuelType();
-  if (myELM327.nb_rx_state == ELM_SUCCESS) {
-    current_fuel_type_code = initialReadFuelTypeCode;
-    DEBUG_PORT.print("Initial Fuel Type Code: ");
-    DEBUG_PORT.println(current_fuel_type_code, HEX); // Wyświetl w HEX
-  } else {
-    myELM327.printError();
-    DEBUG_PORT.println("Błąd początkowego odczytu typu paliwa.");
-    current_fuel_type_code = 0xFF; // Ustaw 0xFF dla błędu
-  }
-
   // Rysowanie początkowego układu na ekranie, przekazując odczytany typ paliwa
-  drawLayout(SCREEN_WIDTH, SCREEN_HEIGHT, TOP_HEIGHT, topLeftW, topLeftH, topRightW, topRightH, current_fuel_type_code);
+  drawLayout(SCREEN_WIDTH, SCREEN_HEIGHT, TOP_HEIGHT, topLeftW, topLeftH, topRightW, topRightH, 0xFF); // Na starcie pokaż "BENZYNA" lub "LPG" po pierwszym odczycie w pętli
 }
 
 void loop() {
   readAndDisplayOBD();
-  delay(50);
+  delay(10);
 }
