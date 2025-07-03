@@ -34,7 +34,7 @@ void drawExampleBitmap(int x, int y);
  * @param h Wysokość obszaru.
  * @param color Kolor tekstu.
  */
-void drawCenteredText(const char* text, int x, int y, int w, int h, uint16_t color);
+void drawCenteredText(const char* text, int x, int y, int w, int h);
 
 /**
  * @brief Rysuje wyśrodkowany tekst na całym ekranie (do komunikatów statusowych).

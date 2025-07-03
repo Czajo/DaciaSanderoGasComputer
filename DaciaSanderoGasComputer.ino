@@ -23,7 +23,7 @@
 #define COLOR_ERROR ST77XX_RED
 
 // Zmienne globalne
-bool debugMode = false;
+bool debugMode = true;
 String debugLog[10]; // Bufor na ostatnie 10 linii logów
 int debugLogIndex = 0;
 
