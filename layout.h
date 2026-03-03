@@ -1,5 +1,5 @@
-#ifndef DISPLAY_H
-#define DISPLAY_H
+#ifndef LAYOUT_H
+#define LAYOUT_H
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
@@ -28,9 +28,6 @@ const uint16_t arrow_rgb565[64] = {
   0x0000, 0x0000, 0x0000, 0x07E0, 0x07E0, 0x0000, 0x0000, 0x0000,
   0x0000, 0x0000, 0x0000, 0x0000, 0x07E0, 0x0000, 0x0000, 0x0000,
 };
-
-// Deklaracja wskaźnika do obiektu Adafruit_ST7789
-Adafruit_ST7789 *tftPtr;
 
 /**
  * @brief Rysuje bitmapę strzałki na wyświetlaczu.
@@ -70,7 +67,7 @@ void drawCenteredText(const char* text, int x, int y, int w, int h) {
  * @param text Tekst do wyświetlenia.
  * @param color Kolor tekstu.
  */
-void showCenteredStatusText(const String text, uint16_t color) {
+void showCenteredStatusText(const String& text, uint16_t color) {
   if (tftPtr) {
     tftPtr->fillScreen(ST77XX_BLACK);
     tftPtr->setTextWrap(false);
@@ -79,16 +76,13 @@ void showCenteredStatusText(const String text, uint16_t color) {
 
     int16_t x1, y1;
     uint16_t w, h;
-    // TFT_WIDTH i TFT_HEIGHT nie są globalne w display.h, więc musimy je przekazać lub założyć
-    // Tutaj zakładamy, że SCREEN_WIDTH i SCREEN_HEIGHT są zdefiniowane w main.ino
-    // i używamy ich jako domyślnych rozmiarów ekranu
-    int screen_width_local = 320; // Możesz dostosować, jeśli znasz dokładny rozmiar ekranu
-    int screen_height_local = 170; // Możesz dostosować, jeśli znasz dokładny rozmiar ekranu
+    int screen_width = tftPtr->width();
+    int screen_height = tftPtr->height();
 
     tftPtr->getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
 
-    int16_t x = (screen_width_local - w) / 2 - x1;
-    int16_t y = (screen_height_local - h) / 2 - y1;
+    int16_t x = (screen_width - w) / 2 - x1;
+    int16_t y = (screen_height - h) / 2 - y1;
 
     tftPtr->setCursor(x, y);
     tftPtr->print(text);
@@ -97,16 +91,25 @@ void showCenteredStatusText(const String text, uint16_t color) {
 
 
 /**
- * @brief Rysuje sekcję zużycia paliwa.
+ * @brief Rysuje sekcję zużycia paliwa z dynamicznym kolorem dopasowanym do typu paliwa.
  * @param value Wartość zużycia paliwa.
+ * @param fuelCode Kod aktualnego paliwa (dla wyboru koloru tekstu).
  * @param x Współrzędna X lewego górnego rogu sekcji.
  * @param y Współrzędna Y lewego górnego rogu sekcji.
  * @param w Szerokość sekcji.
  * @param h Wysokość sekcji.
  */
-void drawFuelConsumption(float value, int x, int y, int w, int h) {
+void drawFuelConsumption(float value, uint8_t fuelCode, int x, int y, int w, int h) {
   if (tftPtr) {
-    tftPtr->setTextColor(ST77XX_GREEN);
+    // Ustalanie koloru napisów zależnie od włączonego paliwa (LPG: Zielony, Benzyna: Pomarańczowy)
+    uint16_t primaryColor = ST77XX_ORANGE; 
+    
+    // Jeśli kod to LPG (0x05 lub 0x0C)
+    if (fuelCode == 0x05 || fuelCode == 0x0C) {
+      primaryColor = ST77XX_GREEN;
+    }
+      
+    tftPtr->setTextColor(primaryColor);
     tftPtr->fillRect(x, y, w, h, ST77XX_BLACK); // Wypełnienie tła czernią
 
     tftPtr->setTextSize(2);
@@ -126,6 +129,7 @@ void drawFuelConsumption(float value, int x, int y, int w, int h) {
     int unitY = startY - (bh / 2); // Pozycja Y dla jednostki
 
     tftPtr->setCursor(unitX, unitY);
+    // Jednostka musi być na sztywno biała niezależnie od paliwa (tylko liczba zmienia kolor obok)
     tftPtr->setTextColor(ST77XX_WHITE);
     tftPtr->print("L/100km");
   }
@@ -212,6 +216,84 @@ void drawSpeed(int value, int x, int y, int w, int h) {
 }
 
 /**
+ * @brief Rysuje sekcję IAT (Intake Air Temp).
+ * @param value Wartość IAT.
+ * @param x Współrzędna X lewego górnego rogu sekcji.
+ * @param y Współrzędna Y lewego górnego rogu sekcji.
+ * @param w Szerokość sekcji.
+ * @param h Wysokość sekcji.
+ */
+void drawIAT(float value, int x, int y, int w, int h) {
+  if (tftPtr) {
+    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
+    tftPtr->setTextColor(ST77XX_YELLOW);
+    drawCenteredText("IAT Temp", x, y, w, h / 2);
+    char buf[10];
+    snprintf(buf, sizeof(buf), "%.1f C", value);
+    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
+    tftPtr->print(buf);
+  }
+}
+
+/**
+ * @brief Rysuje sekcję MAP (Manifold Absolute Pressure).
+ * @param value Wartość MAP.
+ * @param x Współrzędna X lewego górnego rogu sekcji.
+ * @param y Współrzędna Y lewego górnego rogu sekcji.
+ * @param w Szerokość sekcji.
+ * @param h Wysokość sekcji.
+ */
+void drawMAP(int value, int x, int y, int w, int h) {
+  if (tftPtr) {
+    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
+    tftPtr->setTextColor(ST77XX_CYAN);
+    drawCenteredText("MAP Press", x, y, w, h / 2);
+    char buf[10];
+    snprintf(buf, sizeof(buf), "%d kPa", value);
+    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
+    tftPtr->print(buf);
+  }
+}
+
+/**
+ * @brief Rysuje specjalną sekcję dla estymowanego MAF.
+ * @param value Wartość MAF w g/s.
+ * @param x Współrzędna X.
+ * @param y Współrzędna Y.
+ * @param w Szerokość.
+ * @param h Wysokość.
+ */
+void drawEstimatedMAF(float value, int x, int y, int w, int h) {
+  if (tftPtr) {
+    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
+    tftPtr->setTextColor(ST77XX_ORANGE);
+    
+    // Tytuł
+    tftPtr->setTextSize(1);
+    drawCenteredText("Est. MAF", x, y, w, h / 3);
+    
+    // Wartość
+    tftPtr->setTextSize(2);
+    String valStr = String(value, 2);
+    int16_t bx, by;
+    uint16_t bw, bh;
+    tftPtr->getTextBounds(valStr, 0, 0, &bx, &by, &bw, &bh);
+    int startX = x + (w - bw) / 2;
+    int startY = y + (h / 2) + 10;
+    
+    tftPtr->setCursor(startX, startY);
+    tftPtr->print(valStr);
+
+    // Jednostka
+    tftPtr->setTextSize(1);
+    tftPtr->setTextColor(ST77XX_WHITE);
+    int unitX = startX + bw + 4;
+    tftPtr->setCursor(unitX, startY - bh/2);
+    tftPtr->print("g/s");
+  }
+}
+
+/**
  * @brief Rysuje sekcję typu paliwa w oparciu o odczytany kod.
  * @param fuelCode Kod typu paliwa z OBD. Użyj 0xFF dla błędu/nieznanego stanu.
  * @param x Współrzędna X lewego górnego rogu sekcji.
@@ -241,24 +323,50 @@ void drawFuelTypeSection(uint8_t fuelCode, int x, int y, int w, int h) {
 }
 
 /**
- * @brief Rysuje ogólny układ ekranu.
- * @param SCREEN_WIDTH Całkowita szerokość ekranu.
- * @param SCREEN_HEIGHT Całkowita wysokość ekranu.
- * @param TOP_HEIGHT Wysokość górnej sekcji.
- * @param topLeftW Szerokość lewej górnej sekcji.
- * @param topLeftH Wysokość lewej górnej sekcji.
- * @param topRightW Szerokość prawej górnej sekcji.
- * @param topRightH Wysokość prawej górnej sekcji.
- * @param initialFuelTypeCode Początkowy kod typu paliwa do wyświetlenia. Użyj 0xFF dla błędu/nieznanego.
+ * @brief Rysuje sekcję z surowym kodem paliwa.
+ * @param code Kod paliwa (uint8_t).
+ * @param x Współrzędna X.
+ * @param y Współrzędna Y.
+ * @param w Szerokość.
+ * @param h Wysokość.
  */
-void drawLayout(int SCREEN_WIDTH, int SCREEN_HEIGHT, int TOP_HEIGHT, int topLeftW, int topLeftH, int topRightW, int topRightH, uint8_t initialFuelTypeCode) {
+void drawFuelCode(uint8_t code, int x, int y, int w, int h) {
+  if (tftPtr) {
+    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
+    tftPtr->setTextColor(ST77XX_MAGENTA);
+    drawCenteredText("PID 51", x, y, w, h / 2);
+    char buf[10];
+    if (code == 0xFF) {
+      snprintf(buf, sizeof(buf), "ERROR");
+    } else {
+      snprintf(buf, sizeof(buf), "0x%02X", code);
+    }
+    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
+    tftPtr->print(buf);
+  }
+}
+
+/**
+ * @brief Rysuje ogólny układ ekranu głównego (Spalanie, Temperatury, RPM).
+ */
+void drawMainLayout(int SCREEN_WIDTH, int SCREEN_HEIGHT, int TOP_HEIGHT, int topLeftW, int topLeftH, int topRightW, int topRightH, uint8_t initialFuelTypeCode) {
   if (tftPtr) {
     tftPtr->fillScreen(ST77XX_BLACK); // Wyczyść ekran
-
     // Górna lewa sekcja "Spalanie"
     tftPtr->fillRect(0, 0, topLeftW, topLeftH, ST77XX_BLACK);
-
     // Górna prawa sekcja na typ paliwa
+    drawFuelTypeSection(initialFuelTypeCode, topLeftW, 0, topRightW, topRightH);
+  }
+}
+
+/**
+ * @brief Rysuje bazowy układ drugiego ekranu diagnostycznego (MAP, IAT, MAF).
+ */
+void drawDebugLayout(int SCREEN_WIDTH, int SCREEN_HEIGHT, int TOP_HEIGHT, int topLeftW, int topLeftH, int topRightW, int topRightH, uint8_t initialFuelTypeCode) {
+  if (tftPtr) {
+    tftPtr->fillScreen(ST77XX_BLACK); // Wyczyść ekran
+    // Zostawiamy pasek spalania i paliwa na samej górze dla czytelności
+    tftPtr->fillRect(0, 0, topLeftW, topLeftH, ST77XX_BLACK);
     drawFuelTypeSection(initialFuelTypeCode, topLeftW, 0, topRightW, topRightH);
   }
 }
