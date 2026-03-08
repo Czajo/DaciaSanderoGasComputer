@@ -64,14 +64,12 @@ void drawCenteredText(const char* text, int x, int y, int w, int h) {
 
 /**
  * @brief Rysuje wyśrodkowany tekst na całym ekranie (do komunikatów statusowych).
- * @param text Tekst do wyświetlenia.
- * @param color Kolor tekstu.
  */
 void showCenteredStatusText(const String& text, uint16_t color) {
   if (tftPtr) {
     tftPtr->fillScreen(ST77XX_BLACK);
     tftPtr->setTextWrap(false);
-    tftPtr->setTextSize(1); // Większy rozmiar tekstu dla statusu
+    tftPtr->setTextSize(1); // Powrót do mniejszej czcionki (v3.9.1)
     tftPtr->setTextColor(color);
 
     int16_t x1, y1;
@@ -89,286 +87,239 @@ void showCenteredStatusText(const String& text, uint16_t color) {
   }
 }
 
+// --- Ikony Proceduralne ---
 
-/**
- * @brief Rysuje sekcję zużycia paliwa z dynamicznym kolorem dopasowanym do typu paliwa.
- * @param value Wartość zużycia paliwa.
- * @param fuelCode Kod aktualnego paliwa (dla wyboru koloru tekstu).
- * @param x Współrzędna X lewego górnego rogu sekcji.
- * @param y Współrzędna Y lewego górnego rogu sekcji.
- * @param w Szerokość sekcji.
- * @param h Wysokość sekcji.
- */
-void drawFuelConsumption(float value, uint8_t fuelCode, int x, int y, int w, int h) {
-  if (tftPtr) {
-    // Ustalanie koloru napisów zależnie od włączonego paliwa (LPG: Zielony, Benzyna: Pomarańczowy)
-    uint16_t primaryColor = ST77XX_ORANGE; 
-    
-    // Jeśli kod to LPG (0x05 lub 0x0C)
-    if (fuelCode == 0x05 || fuelCode == 0x0C) {
-      primaryColor = ST77XX_GREEN;
-    }
-      
-    tftPtr->setTextColor(primaryColor);
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK); // Wypełnienie tła czernią
+void drawIconGasoline(int x, int y) {
+  tftPtr->fillRect(x+2, y+4, 8, 10, ST77XX_ORANGE); 
+  tftPtr->drawRect(x+10, y+6, 2, 6, ST77XX_ORANGE); 
+}
 
-    tftPtr->setTextSize(2);
-    String valStr = String(value, 1); // Wartość z jednym miejscem po przecinku
-    int startX = x + 10;
-    int startY = y + (h / 2) + 12; // Pozycja Y dla tekstu
+void drawIconGasolineBig(int x, int y) {
+  uint16_t color = ST77XX_ORANGE;
+  tftPtr->fillRect(x+4, y+8, 14, 18, color);    // Korpus
+  tftPtr->fillRect(x+6, y+10, 10, 6, ST77XX_BLACK); // Ekranik
+  tftPtr->drawRect(x+18, y+10, 4, 12, color);   // Wąż
+  tftPtr->fillRect(x+3, y+26, 16, 2, color);    // Podstawa
+}
 
-    tftPtr->setCursor(startX, startY);
-    tftPtr->print(valStr);
+void drawIconLPG(int x, int y) {
+  tftPtr->fillRoundRect(x+2, y+5, 8, 9, 3, ST77XX_GREEN); 
+}
 
-    int16_t bx, by;
-    uint16_t bw, bh;
-    tftPtr->getTextBounds(valStr, startX, startY, &bx, &by, &bw, &bh); // Pobranie wymiarów tekstu
+void drawIconLPGBig(int x, int y) {
+  uint16_t color = ST77XX_GREEN;
+  tftPtr->fillRoundRect(x+4, y+10, 16, 16, 6, color); // Korpus butli
+  tftPtr->fillRect(x+8, y+4, 8, 6, color);           // Górna obejma
+  tftPtr->fillCircle(x+12, y+7, 2, ST77XX_BLACK);    // Zawór
+}
 
-    tftPtr->setTextSize(1);
-    int unitX = bx + bw + 5; // Pozycja X dla jednostki
-    int unitY = startY - (bh / 2); // Pozycja Y dla jednostki
+void drawIconGasolineHuge(int x, int y) {
+  uint16_t color = ST77XX_ORANGE;
+  tftPtr->fillRect(x+6, y+10, 32, 42, color);    // Korpus
+  tftPtr->fillRect(x+10, y+14, 24, 15, ST77XX_BLACK); // Ekranik
+  tftPtr->drawRect(x+38, y+14, 8, 28, color);   // Wąż
+  tftPtr->fillRect(x+4, y+52, 36, 4, color);    // Podstawa
+}
 
-    tftPtr->setCursor(unitX, unitY);
-    // Jednostka musi być na sztywno biała niezależnie od paliwa (tylko liczba zmienia kolor obok)
-    tftPtr->setTextColor(ST77XX_WHITE);
-    tftPtr->print("L/100km");
-  }
+void drawIconLPGHuge(int x, int y) {
+  uint16_t color = ST77XX_GREEN;
+  tftPtr->fillRoundRect(x+6, y+18, 40, 38, 14, color); // Korpus butli
+  tftPtr->fillRect(x+16, y+6, 20, 14, color);           // Górna obejma
+  tftPtr->fillCircle(x+26, y+13, 4, ST77XX_BLACK);    // Zawór
+}
+
+void drawIconOil(int x, int y) {
+  tftPtr->fillCircle(x+6, y+10, 3, ST77XX_YELLOW); 
+  tftPtr->fillTriangle(x+3, y+10, x+9, y+10, x+6, y+4, ST77XX_YELLOW); 
+}
+
+void drawIconCoolant(int x, int y) {
+  tftPtr->drawRect(x+5, y+2, 2, 10, ST77XX_CYAN); 
+  tftPtr->fillCircle(x+6, y+12, 3, ST77XX_CYAN);  
+}
+
+void drawIconRoad(int x, int y) {
+  tftPtr->drawLine(x+2, y+14, x+5, y+2, ST77XX_WHITE);  
+  tftPtr->drawLine(x+10, y+14, x+7, y+2, ST77XX_WHITE); 
+  tftPtr->drawFastVLine(x+6, y+4, 2, 0xAD55);           
+  tftPtr->drawFastVLine(x+6, y+10, 2, 0xAD55);
 }
 
 /**
- * @brief Rysuje sekcję temperatury oleju.
- * @param value Wartość temperatury oleju.
- * @param x Współrzędna X lewego górnego rogu sekcji.
- * @param y Współrzędna Y lewego górnego rogu sekcji.
- * @param w Szerokość sekcji.
- * @param h Wysokość sekcji.
+ * @brief Rysuje zaawansowany ekran INFO (SIDE-BY-SIDE) (v4.4).
  */
-void drawOilTemp(float value, int x, int y, int w, int h) {
-  if (tftPtr) {
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
-    tftPtr->setTextColor(ST77XX_YELLOW);
-    drawCenteredText("temp oleju", x, y, w, h / 2); // Rysowanie nagłówka
-    char buf[10];
-    snprintf(buf, sizeof(buf), "%.1f °C", value); // Formatowanie wartości
-    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3); // Wyśrodkowanie wartości
-    tftPtr->print(buf);
-  }
-}
-
-/**
- * @brief Rysuje sekcję temperatury płynu chłodniczego.
- * @param value Wartość temperatury płynu chłodniczego.
- * @param x Współrzędna X lewego górnego rogu sekcji.
- * @param y Współrzędna Y lewego górnego rogu sekcji.
- * @param w Szerokość sekcji.
- * @param h Wysokość sekcji.
- */
-void drawCoolantTemp(float value, int x, int y, int w, int h) {
-  if (tftPtr) {
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
-    tftPtr->setTextColor(ST77XX_CYAN);
-    drawCenteredText("temp coolant", x, y, w, h / 2);
-    char buf[10];
-    snprintf(buf, sizeof(buf), "%.1f °C", value);
-    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
-    tftPtr->print(buf);
-  }
-}
-
-/**
- * @brief Rysuje sekcję obrotów na minutę (RPM).
- * @param value Wartość RPM.
- * @param x Współrzędna X lewego górnego rogu sekcji.
- * @param y Współrzędna Y lewego górnego rogu sekcji.
- * @param w Szerokość sekcji.
- * @param h Wysokość sekcji.
- */
-void drawRPM(int value, int x, int y, int w, int h) {
-  if (tftPtr) {
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
-    tftPtr->setTextColor(ST77XX_MAGENTA);
-    drawCenteredText("RPM", x, y, w, h / 2);
-    char buf[10];
-    snprintf(buf, sizeof(buf), "%d", value);
-    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
-    tftPtr->print(buf);
-  }
-}
-
-/**
- * @brief Rysuje sekcję prędkości.
- * @param value Wartość prędkości.
- * @param x Współrzędna X lewego górnego rogu sekcji.
- * @param y Współrzędna Y lewego górnego rogu sekcji.
- * @param w Szerokość sekcji.
- * @param h Wysokość sekcji.
- */
-void drawSpeed(int value, int x, int y, int w, int h) {
-  if (tftPtr) {
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
-    tftPtr->setTextColor(ST77XX_ORANGE);
-    drawCenteredText("SPEED", x, y, w, h / 2);
-    char buf[10];
-    snprintf(buf, sizeof(buf), "%d km/h", value);
-    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
-    tftPtr->print(buf);
-  }
-}
-
-/**
- * @brief Rysuje sekcję IAT (Intake Air Temp).
- * @param value Wartość IAT.
- * @param x Współrzędna X lewego górnego rogu sekcji.
- * @param y Współrzędna Y lewego górnego rogu sekcji.
- * @param w Szerokość sekcji.
- * @param h Wysokość sekcji.
- */
-void drawIAT(float value, int x, int y, int w, int h) {
-  if (tftPtr) {
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
-    tftPtr->setTextColor(ST77XX_YELLOW);
-    drawCenteredText("IAT Temp", x, y, w, h / 2);
-    char buf[10];
-    snprintf(buf, sizeof(buf), "%.1f C", value);
-    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
-    tftPtr->print(buf);
-  }
-}
-
-/**
- * @brief Rysuje sekcję MAP (Manifold Absolute Pressure).
- * @param value Wartość MAP.
- * @param x Współrzędna X lewego górnego rogu sekcji.
- * @param y Współrzędna Y lewego górnego rogu sekcji.
- * @param w Szerokość sekcji.
- * @param h Wysokość sekcji.
- */
-void drawMAP(int value, int x, int y, int w, int h) {
-  if (tftPtr) {
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
-    tftPtr->setTextColor(ST77XX_CYAN);
-    drawCenteredText("MAP Press", x, y, w, h / 2);
-    char buf[10];
-    snprintf(buf, sizeof(buf), "%d kPa", value);
-    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
-    tftPtr->print(buf);
-  }
-}
-
-/**
- * @brief Rysuje specjalną sekcję dla estymowanego MAF.
- * @param value Wartość MAF w g/s.
- * @param x Współrzędna X.
- * @param y Współrzędna Y.
- * @param w Szerokość.
- * @param h Wysokość.
- */
-void drawEstimatedMAF(float value, int x, int y, int w, int h) {
-  if (tftPtr) {
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
-    tftPtr->setTextColor(ST77XX_ORANGE);
-    
-    // Tytuł
-    tftPtr->setTextSize(1);
-    drawCenteredText("Est. MAF", x, y, w, h / 3);
-    
-    // Wartość
-    tftPtr->setTextSize(2);
-    String valStr = String(value, 2);
-    int16_t bx, by;
-    uint16_t bw, bh;
-    tftPtr->getTextBounds(valStr, 0, 0, &bx, &by, &bw, &bh);
-    int startX = x + (w - bw) / 2;
-    int startY = y + (h / 2) + 10;
-    
-    tftPtr->setCursor(startX, startY);
-    tftPtr->print(valStr);
-
-    // Jednostka
-    tftPtr->setTextSize(1);
-    tftPtr->setTextColor(ST77XX_WHITE);
-    int unitX = startX + bw + 4;
-    tftPtr->setCursor(unitX, startY - bh/2);
-    tftPtr->print("g/s");
-  }
-}
-
-/**
- * @brief Rysuje sekcję typu paliwa w oparciu o odczytany kod.
- * @param fuelCode Kod typu paliwa z OBD. Użyj 0xFF dla błędu/nieznanego stanu.
- * @param x Współrzędna X lewego górnego rogu sekcji.
- * @param y Współrzędna Y lewego górnego rogu sekcji.
- * @param w Szerokość sekcji.
- * @param h Wysokość sekcji.
- */
-void drawFuelTypeSection(uint8_t fuelCode, int x, int y, int w, int h) {
+void drawInfoPage(float tripDist, float tripGas, float tripLpg, float tankDist, float tankGas, float tankLpg, uint32_t logs) {
   if (!tftPtr) return;
+  tftPtr->fillScreen(ST77XX_BLACK);
+  
+  // Naglowek
+  tftPtr->setTextSize(1);
+  tftPtr->setTextColor(ST77XX_CYAN);
+  tftPtr->setCursor(120, 15);
+  tftPtr->print("STATYSTYKI");
+  tftPtr->drawFastHLine(0, 32, 320, 0x3186);
+  
+  tftPtr->setTextSize(1);
+  // SEKCJA TRASA
+  tftPtr->setTextColor(0xAD55);
+  tftPtr->setCursor(20, 45);
+  tftPtr->print("TRASA: ");
+  tftPtr->print(tripDist, 1); tftPtr->print(" km total");
+  
+  tftPtr->setTextColor(ST77XX_ORANGE);
+  tftPtr->setCursor(40, 65);
+  tftPtr->print("[B] "); tftPtr->print(tripGas, 1); tftPtr->print(" km");
+  
+  tftPtr->setTextColor(ST77XX_GREEN);
+  tftPtr->setCursor(180, 65);
+  tftPtr->print("[L] "); tftPtr->print(tripLpg, 1); tftPtr->print(" km");
 
-  // Uproszczona logika: tylko BENZYNA lub LPG
-  const char* fuelText;
-  uint16_t bgColor;
-  uint16_t textColor = ST77XX_BLACK;
-
-  if (fuelCode == 0x05 || fuelCode == 0x0C) {
-    fuelText = "LPG";
-    bgColor = ST77XX_GREEN;
-  } else {
-    fuelText = "BENZYNA";
-    bgColor = ST77XX_ORANGE;
-  }
-
-  tftPtr->fillRect(x, y, w, h, bgColor);
-  tftPtr->setTextColor(textColor);
-  drawCenteredText(fuelText, x, y, w, h);
+  // SEKCJA TANKOWANIE
+  tftPtr->setTextColor(0xAD55);
+  tftPtr->setCursor(20, 95);
+  tftPtr->print("OD RESETU TANKOWANIA: ");
+  tftPtr->print(tankDist, 1); tftPtr->print(" km");
+  
+  tftPtr->setTextColor(ST77XX_ORANGE);
+  tftPtr->setCursor(40, 115);
+  tftPtr->print("[B] "); tftPtr->print(tankGas, 1); tftPtr->print(" km");
+  
+  tftPtr->setTextColor(ST77XX_GREEN);
+  tftPtr->setCursor(180, 115);
+  tftPtr->print("[L] "); tftPtr->print(tankLpg, 1); tftPtr->print(" km");
+  
+  // Stopka INFO (Logi)
+  tftPtr->drawFastHLine(0, 145, 320, 0x3186);
+  tftPtr->setTextColor(0x7BEF);
+  
+  String logsText = "ZAPISANYCH LOGOW: " + String(logs);
+  int16_t x1, y1;
+  uint16_t w1, h1;
+  tftPtr->getTextBounds(logsText, 0, 0, &x1, &y1, &w1, &h1);
+  
+  tftPtr->setCursor((320 - w1) / 2, 155);
+  tftPtr->print(logsText);
 }
 
 /**
- * @brief Rysuje sekcję z surowym kodem paliwa.
- * @param code Kod paliwa (uint8_t).
- * @param x Współrzędna X.
- * @param y Współrzędna Y.
- * @param w Szerokość.
- * @param h Wysokość.
+ * @brief Rysuje nowoczesną kartę statystyk z ikoną.
  */
-void drawFuelCode(uint8_t code, int x, int y, int w, int h) {
-  if (tftPtr) {
-    tftPtr->fillRect(x, y, w, h, ST77XX_BLACK);
-    tftPtr->setTextColor(ST77XX_MAGENTA);
-    drawCenteredText("PID 51", x, y, w, h / 2);
-    char buf[10];
-    if (code == 0xFF) {
-      snprintf(buf, sizeof(buf), "ERROR");
-    } else {
-      snprintf(buf, sizeof(buf), "0x%02X", code);
-    }
-    tftPtr->setCursor(x + (w - strlen(buf) * 6) / 2, y + h * 2 / 3);
-    tftPtr->print(buf);
+void drawStatCard(const char* label, float value, const char* unit, uint16_t color, int x, int y, int w, int h, int iconType, uint8_t fuelCode) {
+  if (!tftPtr) return;
+  
+  // Tło i ramka karty
+  tftPtr->fillRoundRect(x+2, y+2, w-4, h-4, 4, 0x0841); 
+  tftPtr->drawRoundRect(x+2, y+2, w-4, h-4, 4, 0x3186); 
+  
+  // Etykieta karty (v4.3.2) - Czarny skrot, przesuniety glebiej
+  tftPtr->setTextSize(1);
+  tftPtr->setTextColor(ST77XX_BLACK); 
+  tftPtr->setCursor(x + w - 28, y + 16);
+  if (iconType == 1) tftPtr->print("TK");      // Tankowanie (TK)
+  else if (iconType == 2) tftPtr->print("TR"); // Trasa (TR)
+  else if (iconType == 3) tftPtr->print("OL"); // Olej (OL)
+  else if (iconType == 4) tftPtr->print("PL"); // Plyn (PL)
+
+  // Ikona (Przesunięta na środek lewej krawędzi)
+  int iconX = x + 10;
+  int iconY = y + (h / 2) - 8;
+  if (iconType == 1) {
+    if (fuelCode == 0x05 || fuelCode == 0x0C) drawIconLPG(iconX, iconY);
+    else drawIconGasoline(iconX, iconY);
   }
+  else if (iconType == 2) drawIconRoad(iconX, iconY);
+  else if (iconType == 3) drawIconOil(iconX, iconY);
+  else if (iconType == 4) drawIconCoolant(iconX, iconY);
+
+  // Wartość - POWIĘKSZONA (v4.0)
+  tftPtr->setTextSize(2);
+  tftPtr->setTextColor(color);
+  String valStr = String(value, (value < 100 && value > -10) ? 1 : 0);
+  
+  int16_t x1, y1;
+  uint16_t w1, h1;
+  tftPtr->getTextBounds(valStr, 0, 0, &x1, &y1, &w1, &h1);
+  
+  // Wyśrodkowanie wartości z uwzględnieniem ikony
+  int valX = x + 40; // Przesunięcie od lewej (ikona zajmuje ok 30px)
+  int valY = y + (h - h1) / 2 - y1;
+  tftPtr->setCursor(valX, valY);
+  tftPtr->print(valStr);
+  
+  // Jednostka - Mała (Size 1) obok wartości
+  tftPtr->setTextSize(1);
+  tftPtr->setTextColor(0x7BEF);
+  tftPtr->setCursor(valX + w1 + 4, valY + 6);
+  tftPtr->print(unit);
 }
 
 /**
- * @brief Rysuje ogólny układ ekranu głównego (Spalanie, Temperatury, RPM).
+ * @brief Rysuje główną sekcję chwilową (duża karta na górze).
+ */
+void drawInstantCard(float instVal, const char* unit, uint8_t fuelCode, int x, int y, int w, int h) {
+  uint16_t color = (fuelCode == 0x05 || fuelCode == 0x0C) ? ST77XX_GREEN : ST77XX_ORANGE;
+
+  tftPtr->fillRoundRect(x+2, y+2, w-4, h-4, 6, 0x0000);
+  tftPtr->drawRoundRect(x+2, y+2, w-4, h-4, 6, color);  
+  
+  // GIGANTYCZNE IKONY (v4.5) - Na wysokosc calego kafelka
+  if (fuelCode == 0x05 || fuelCode == 0x0C) {
+    drawIconLPGHuge(x + 15, y + 2);
+  } else {
+    drawIconGasolineHuge(x + 15, y + 2);
+  }
+
+  tftPtr->setTextSize(3);
+  tftPtr->setTextColor(color);
+  String valStr = String(instVal, 1);
+  int16_t x1, y1;
+  uint16_t w1, h1;
+  tftPtr->getTextBounds(valStr, 0, 0, &x1, &y1, &w1, &h1);
+  
+  // Przesunięcie wartości w prawo, aby zrobić miejsce dla gigantycznej ikony
+  int valX = x + 85 + (w - 85 - w1) / 2;
+  tftPtr->setCursor(valX, y + 42); 
+  tftPtr->print(valStr);
+
+  tftPtr->setTextSize(1);
+  tftPtr->setTextColor(ST77XX_WHITE);
+  tftPtr->setCursor(valX + w1 + 6, y + 50); // Jednostka tuż za wartością
+  tftPtr->print(unit);
+}
+
+/**
+ * @brief Rysuje ogólny układ ekranu głównego (Siatka 2-kolumnowa).
  */
 void drawMainLayout(int SCREEN_WIDTH, int SCREEN_HEIGHT, int TOP_HEIGHT, int topLeftW, int topLeftH, int topRightW, int topRightH, uint8_t initialFuelTypeCode) {
   if (tftPtr) {
-    tftPtr->fillScreen(ST77XX_BLACK); // Wyczyść ekran
-    // Górna lewa sekcja "Spalanie"
-    tftPtr->fillRect(0, 0, topLeftW, topLeftH, ST77XX_BLACK);
-    // Górna prawa sekcja na typ paliwa
-    drawFuelTypeSection(initialFuelTypeCode, topLeftW, 0, topRightW, topRightH);
+    tftPtr->fillScreen(ST77XX_BLACK);
   }
 }
 
 /**
- * @brief Rysuje bazowy układ drugiego ekranu diagnostycznego (MAP, IAT, MAF).
+ * @brief Główna funkcja aktualizująca dane na nowym układzie.
  */
-void drawDebugLayout(int SCREEN_WIDTH, int SCREEN_HEIGHT, int TOP_HEIGHT, int topLeftW, int topLeftH, int topRightW, int topRightH, uint8_t initialFuelTypeCode) {
-  if (tftPtr) {
-    tftPtr->fillScreen(ST77XX_BLACK); // Wyczyść ekran
-    // Zostawiamy pasek spalania i paliwa na samej górze dla czytelności
-    tftPtr->fillRect(0, 0, topLeftW, topLeftH, ST77XX_BLACK);
-    drawFuelTypeSection(initialFuelTypeCode, topLeftW, 0, topRightW, topRightH);
+void updateTripDisplay(float instLH, float inst100, float avgTrip, float avgTank, 
+                       float oilTemp, float coolTemp, uint8_t fuelCode) {
+  if (!tftPtr) return;
+  
+  // 1. Sekcja górna (Live)
+  if (inst100 > 0.1 && inst100 < 99) {
+    drawInstantCard(inst100, "L/100", fuelCode, 0, 0, 320, 65);
+  } else {
+    drawInstantCard(instLH, "L/h", fuelCode, 0, 0, 320, 65);
   }
+  
+  int cardW = 160;
+  int cardH = 48;
+  int startY = 68;
+
+  // 2. Sekcja dolna - Moduły
+  drawStatCard("AVG TRASA", avgTrip, "L/100", ST77XX_WHITE, 0, startY, cardW, cardH, 2, fuelCode);
+  drawStatCard("AVG TANK", avgTank, "L/100", ST77XX_CYAN, cardW, startY, cardW, cardH, 1, fuelCode);
+  
+  drawStatCard("TEMP OLEJU", oilTemp, "C", ST77XX_YELLOW, 0, startY + cardH + 2, cardW, cardH, 3, fuelCode);
+  drawStatCard("TEMP PLYNU", coolTemp, "C", ST77XX_CYAN, cardW, startY + cardH + 2, cardW, cardH, 4, fuelCode);
 }
 
 #endif
